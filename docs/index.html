@@ -201,28 +201,27 @@ function showError(err) {
   const isPwMissing = /SMTP_PASSWORD env not set|GMAIL_APP_PASSWORD env not set/i.test(msg);
 
   if (isAuthFail || isPwMissing) {
-    title.textContent = "Mail sunucusu kimlik bilgilerini reddetti";
+    title.textContent = "Gmail SMTP kimlik bilgileri reddedildi";
     body.innerHTML = `
-      <p class="mb-2">Mail gönderilemiyor. Brevo SMTP key'ini güncellemen gerek (3 adım):</p>
+      <p class="mb-2">Mail gönderilemiyor. App password muhtemelen yanlış hesaptan üretilmiş ya da süresi geçmiş:</p>
       <ol class="list-decimal list-inside space-y-1.5 text-red-100/90">
         <li>
-          <a href="https://app.brevo.com/settings/keys/smtp" target="_blank" rel="noopener" class="underline hover:text-white">
-            Brevo SMTP key sayfası
+          <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="underline hover:text-white">
+            myaccount.google.com/apppasswords
           </a>
-          → "Master Password"u kopyala (uzun "xkeysib-..." string).
-          <br><span class="text-xs text-red-300/70">Brevo hesabın yoksa: app.brevo.com'dan Google ile <strong>talhabozan@gmail.com</strong> ile kayıt ol, sender olarak aynı maili ekle, gelen verification linkine tıkla.</span>
+          — <strong>talhabozan34@gmail.com</strong> hesabında olduğundan emin ol, yeni bir app password üret, 16 hane şifreyi kopyala.
         </li>
         <li>
           <a href="https://github.com/talha-bozan/flight-fetcher/settings/secrets/actions" target="_blank" rel="noopener" class="underline hover:text-white">
             GitHub repo secrets
           </a>
-          → <code class="text-xs bg-red-900/50 px-1 rounded">GMAIL_APP_PASSWORD</code> secret'ı bul → <strong>Update</strong> → Brevo key'i yapıştır.
+          → <code class="text-xs bg-red-900/50 px-1 rounded">GMAIL_APP_PASSWORD</code> → <strong>Update</strong> → yeni şifreyi yapıştır.
         </li>
         <li>
           <a href="https://github.com/talha-bozan/flight-fetcher/actions/workflows/check.yml" target="_blank" rel="noopener" class="underline hover:text-white">
             Workflow'u tetikle
           </a>
-          → <strong>Run workflow</strong>. Sonraki run'da bu kutu kaybolur, <code class="text-xs bg-red-900/50 px-1 rounded">zubeyirtemel@outlook.com</code>'a mail (ucuz uçuş varsa) düşer.
+          → <strong>Run workflow</strong>.
         </li>
       </ol>`;
   } else {
