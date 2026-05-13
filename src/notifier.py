@@ -1,0 +1,137 @@
+"""Gmail SMTP email sender. Skipped silently in DRY_RUN."""
+import logging
+import smtplib
+from email.message import EmailMessage
+
+from src import config
+
+logger = logging.getLogger(__name__)
+
+
+def send_alert(flights: list[dict]) -> None:
+    """One consolidated email listing every flight under THRESHOLD_TRY."""
+    if not flights:
+        return
+
+    sorted_flights = sorted(flights, key=lambda f: f["price_try"])
+    lowest = sorted_flights[0]["price_try"]
+    subject = f"Istanbul ucusu 10K TL alti - {len(flights)} secenek (En dusuk: {lowest:.0f} TL)"
+
+    if config.DRY_RUN:
+        logger.info(f"[DRY_RUN] would email '{subject}' to {config.RECIPIENT_EMAIL}")
+        for f in sorted_flights:
+            logger.info(
+                f"  - {f['origin']}->{f['dest']} {f['date']}: "
+                f"{f['price_try']:.0f} TL ({f['price_str']}) {f['airline']}"
+            )
+        return
+
+    if not config.GMAIL_APP_PASSWORD:
+        logger.error("GMAIL_APP_PASSWORD env not set; cannot send email")
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = config.SENDER_EMAIL
+    msg["To"] = config.RECIPIENT_EMAIL
+    msg.set_content(_build_text(sorted_flights))
+    msg.add_alternative(_build_html(sorted_flights), subtype="html")
+    _send(msg)
+
+
+def send_admin_alert(message: str) -> None:
+    if config.DRY_RUN:
+        logger.info(f"[DRY_RUN] admin alert: {message}")
+        return
+    if not config.GMAIL_APP_PASSWORD:
+        logger.error("GMAIL_APP_PASSWORD not set; cannot send admin alert")
+        return
+    msg = EmailMessage()
+    msg["Subject"] = "[flight-fetcher] FAILURE"
+    msg["From"] = config.SENDER_EMAIL
+    msg["To"] = config.ADMIN_EMAIL
+    msg.set_content(message)
+    _send(msg)
+
+
+def _send(msg: EmailMessage) -> None:
+    with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as smtp:
+        smtp.starttls()
+        smtp.login(config.SENDER_EMAIL, config.GMAIL_APP_PASSWORD)
+        smtp.send_message(msg)
+    logger.info(f"Email sent to {msg['To']}: {msg['Subject']}")
+
+
+def _gflights_link(f: dict) -> str:
+    return (
+        f"https://www.google.com/travel/flights?q="
+        f"Flights+from+{f['origin']}+to+{f['dest']}+on+{f['date']}"
+    )
+
+
+def _build_text(flights: list[dict]) -> str:
+    lines = [
+        "Hollanda -> Istanbul ucus firsatlari (10,000 TL alti)",
+        f"Toplam {len(flights)} secenek bulundu.",
+        "",
+    ]
+    for f in flights:
+        lines.append(
+            f"  {f['origin']}->{f['dest']}  {f['date']}  "
+            f"{f['airline']}  {f['departure']} -> {f['arrival']}  "
+            f"{f['duration']}  ~{f['price_try']:.0f} TL ({f['price_str']})"
+        )
+    lines.append("")
+    lines.append("Google Flights linkleri:")
+    seen = set()
+    for f in flights:
+        key = (f["origin"], f["dest"], f["date"])
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"  {f['origin']}->{f['dest']} {f['date']}: {_gflights_link(f)}")
+    lines.append("")
+    lines.append("-- flight-fetcher botu (otomatik)")
+    return "\n".join(lines)
+
+
+def _build_html(flights: list[dict]) -> str:
+    rows = []
+    for f in flights:
+        rows.append(
+            f"<tr>"
+            f"<td>{_esc(f['origin'])}&rarr;{_esc(f['dest'])}</td>"
+            f"<td>{_esc(f['date'])}</td>"
+            f"<td>{_esc(f['airline'])}</td>"
+            f"<td>{_esc(f['departure'])}<br><small>&rarr; {_esc(f['arrival'])}</small></td>"
+            f"<td>{_esc(f['duration'])}</td>"
+            f"<td><b>{f['price_try']:.0f} TL</b><br><small>({_esc(f['price_str'])})</small></td>"
+            f'<td><a href="{_gflights_link(f)}">Google Flights</a></td>'
+            f"</tr>"
+        )
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+        '<body style="font-family:Arial,sans-serif;color:#222;">'
+        "<h2>&#9992;&#65039; Hollanda &rarr; Istanbul ucus firsatlari</h2>"
+        f"<p><b>{len(flights)} secenek</b> 10,000 TL altinda bulundu.</p>"
+        '<table cellpadding="8" cellspacing="0" '
+        'style="border-collapse:collapse;border:1px solid #ccc;">'
+        '<thead><tr style="background:#f0f0f0;">'
+        "<th>Rota</th><th>Tarih</th><th>Havayolu</th><th>Saat</th>"
+        "<th>Sure</th><th>Fiyat</th><th>Link</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+        '<p style="color:#666;font-size:12px;">'
+        "Bu mail <code>flight-fetcher</code> botu tarafindan otomatik gonderildi. "
+        "Tarihleri degistirmek icin <code>src/config.py</code> dosyasini duzenle."
+        "</p></body></html>"
+    )
+
+
+def _esc(s: str) -> str:
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
