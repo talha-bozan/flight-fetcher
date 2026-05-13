@@ -36,7 +36,11 @@ RECIPIENT_EMAIL = os.environ.get("FF_RECIPIENT", "zubeyirtemel@outlook.com")
 ADMIN_EMAIL = os.environ.get("FF_ADMIN", "talhabozan@gmail.com")
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+_raw_app_pw = os.environ.get("GMAIL_APP_PASSWORD", "")
+# Gmail app passwords are displayed as 4 space-separated groups of 4 chars
+# (`abcd efgh ijkl mnop`) but the SMTP server expects no whitespace. Strip
+# defensively so we work regardless of how the secret was pasted.
+GMAIL_APP_PASSWORD = "".join(_raw_app_pw.split())
 
 # === Behavior ===
 COOLDOWN_HOURS = 24

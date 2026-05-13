@@ -55,11 +55,50 @@ def send_admin_alert(message: str) -> None:
 
 
 def _send(msg: EmailMessage) -> None:
+    pw_len = len(config.GMAIL_APP_PASSWORD)
+    logger.info(
+        "Connecting to %s:%d as %s (app password length=%d)",
+        config.SMTP_HOST, config.SMTP_PORT, config.SENDER_EMAIL, pw_len,
+    )
+    if pw_len != 16:
+        logger.warning(
+            "Gmail app passwords are 16 chars after stripping spaces; got %d. "
+            "Login will probably fail.", pw_len,
+        )
     with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as smtp:
         smtp.starttls()
         smtp.login(config.SENDER_EMAIL, config.GMAIL_APP_PASSWORD)
         smtp.send_message(msg)
-    logger.info(f"Email sent to {msg['To']}: {msg['Subject']}")
+    logger.info("Email sent to %s: %s", msg["To"], msg["Subject"])
+
+
+def smtp_self_test() -> tuple[bool, str]:
+    """Connect + LOGIN to Gmail SMTP without sending. Returns (ok, message)."""
+    if not config.GMAIL_APP_PASSWORD:
+        return False, "GMAIL_APP_PASSWORD env not set"
+    pw_len = len(config.GMAIL_APP_PASSWORD)
+    if pw_len != 16:
+        return False, (
+            f"App password is {pw_len} chars after stripping spaces; "
+            f"expected exactly 16. Generate a fresh one at "
+            f"myaccount.google.com/apppasswords and paste it into the "
+            f"GMAIL_APP_PASSWORD secret."
+        )
+    try:
+        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(config.SENDER_EMAIL, config.GMAIL_APP_PASSWORD)
+        return True, f"SMTP login OK as {config.SENDER_EMAIL}"
+    except smtplib.SMTPAuthenticationError as e:
+        return False, (
+            f"SMTP authentication FAILED: {e.smtp_code} {e.smtp_error!r}. "
+            f"Common causes: (1) sender email mismatch — the app password "
+            f"belongs to {config.SENDER_EMAIL}; (2) 2-Step Verification "
+            f"disabled on the Google account; (3) wrong/old app password "
+            f"in the GMAIL_APP_PASSWORD secret."
+        )
+    except Exception as e:
+        return False, f"SMTP self-test failed: {type(e).__name__}: {e}"
 
 
 def _gflights_link(f: dict) -> str:

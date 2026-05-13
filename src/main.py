@@ -32,6 +32,16 @@ def _run() -> None:
         logger.info("DRY_RUN mode ON; no emails will be sent")
     logger.info("Threshold: %.0f TL", config.THRESHOLD_TRY)
 
+    # Fail fast on bad SMTP creds — no point doing 36 queries first.
+    if not config.DRY_RUN:
+        ok, msg = notifier.smtp_self_test()
+        if ok:
+            logger.info("SMTP self-test OK")
+        else:
+            logger.error("SMTP self-test FAILED: %s", msg)
+            _write_error(f"SMTP self-test FAILED: {msg}")
+            # Continue anyway: fetch + log cheap flights even if email won't go.
+
     st = state.load()
     state.prune(st)
 

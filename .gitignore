@@ -12,3 +12,4 @@ env/
 .mypy_cache/
 .ruff_cache/
 *.log
+last_error.log
