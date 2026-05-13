@@ -34,7 +34,10 @@ jobs:
 
       - name: Run flight check
         env:
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          # Reusing the existing secret name GMAIL_APP_PASSWORD so the user
+          # doesn't have to recreate it — the code now treats this as a
+          # generic SMTP password (Brevo by default; see src/config.py).
+          SMTP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           PYTHONIOENCODING: utf-8
         run: python -m src.main
