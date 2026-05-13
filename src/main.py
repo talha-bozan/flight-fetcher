@@ -1,12 +1,16 @@
 """Orchestrator: fetch → convert → filter → dedupe → notify → save state.
 
 Always exits 0 so GitHub Actions never disables the cron after transient
-failures. Real failures are surfaced via the admin-alert email after
-MAX_CONSECUTIVE_FAILURES empty runs.
+failures. Any uncaught exception is written to ``last_error.log`` at the repo
+root, which gets committed by the workflow — that way the failure is visible
+on GitHub without needing to read the runner's private logs.
 """
+import datetime
 import logging
 import sys
 import time
+import traceback
+from pathlib import Path
 
 from src import config, currency, fetcher, notifier, state
 
@@ -16,8 +20,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main")
 
+ERROR_LOG = Path(__file__).resolve().parent.parent / "last_error.log"
 
-def main() -> None:
+
+def _run() -> None:
     logger.info(
         "Starting flight check: %d origins x %d destinations x %d dates",
         len(config.ORIGINS), len(config.DESTINATIONS), len(config.DEPARTURE_DATES),
@@ -90,19 +96,26 @@ def main() -> None:
 
     logger.info("New (not deduped) cheap flights: %d", len(new_cheap))
     if new_cheap:
-        notifier.send_alert(new_cheap)
-        for f in new_cheap:
-            state.mark_notified(st, state.make_key(f, f["price_try"]))
+        try:
+            notifier.send_alert(new_cheap)
+            for f in new_cheap:
+                state.mark_notified(st, state.make_key(f, f["price_try"]))
+        except Exception as e:
+            logger.error("send_alert failed: %s\n%s", e, traceback.format_exc())
+            _write_error(f"send_alert failed: {e}\n{traceback.format_exc()}")
 
     if total > 0 and failures == total:
         st["consecutive_failures"] = st.get("consecutive_failures", 0) + 1
         logger.warning("All queries failed (consecutive=%d)", st["consecutive_failures"])
         if st["consecutive_failures"] >= config.MAX_CONSECUTIVE_FAILURES:
-            notifier.send_admin_alert(
-                f"flight-fetcher: {st['consecutive_failures']} consecutive runs returned 0 flights "
-                f"across all {total} queries. fast-flights may be broken or Google Flights "
-                f"is blocking GitHub Actions IPs."
-            )
+            try:
+                notifier.send_admin_alert(
+                    f"flight-fetcher: {st['consecutive_failures']} consecutive runs returned 0 flights "
+                    f"across all {total} queries. fast-flights may be broken or Google Flights "
+                    f"is blocking GitHub Actions IPs."
+                )
+            except Exception as e:
+                logger.error("send_admin_alert failed: %s", e)
     else:
         if st.get("consecutive_failures", 0) > 0:
             logger.info("Resetting consecutive_failures from %d to 0", st["consecutive_failures"])
@@ -110,6 +123,33 @@ def main() -> None:
 
     state.save(st)
     logger.info("Done.")
+
+
+def _write_error(text: str) -> None:
+    """Append an error entry to last_error.log so it survives in the commit."""
+    try:
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        with open(ERROR_LOG, "a", encoding="utf-8") as f:
+            f.write(f"\n========== {timestamp} ==========\n{text}\n")
+    except Exception as e:
+        logger.error("Failed to write last_error.log: %s", e)
+
+
+def main() -> None:
+    """Top-level entry: catches every exception and exits 0 always."""
+    try:
+        _run()
+    except SystemExit:
+        raise
+    except BaseException as e:
+        tb = traceback.format_exc()
+        logger.error("UNCAUGHT in _run(): %s\n%s", e, tb)
+        _write_error(f"UNCAUGHT in _run(): {e}\n{tb}")
+        # Best effort admin email — don't crash if even this fails.
+        try:
+            notifier.send_admin_alert(f"flight-fetcher CRASH:\n{tb}")
+        except Exception:
+            pass
     sys.exit(0)
 
 
