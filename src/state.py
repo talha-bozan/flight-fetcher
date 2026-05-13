@@ -12,7 +12,8 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
-STATE_FILE = Path(__file__).resolve().parent.parent / "state.json"
+STATE_FILE = Path(__file__).resolve().parent.parent / "docs" / "state.json"
+MAX_RECENT_RUNS = 20
 
 
 def load() -> dict:
@@ -24,6 +25,11 @@ def load() -> dict:
         data.setdefault("alerts", {})
         data.setdefault("consecutive_failures", 0)
         data.setdefault("last_run", None)
+        data.setdefault("stats", {"total_runs": 0, "total_emails_sent": 0})
+        data.setdefault("current_cheap_flights", [])
+        data.setdefault("recent_runs", [])
+        data.setdefault("latest_error", None)
+        data.setdefault("config_snapshot", {})
         return data
     except Exception as e:
         logger.warning(f"state.json corrupted ({e}); resetting")
@@ -32,8 +38,21 @@ def load() -> dict:
 
 def save(state: dict) -> None:
     state["last_run"] = _now().isoformat()
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True, ensure_ascii=False)
+
+
+def record_run(state: dict, run_summary: dict) -> None:
+    """Append a run summary to recent_runs (bounded), bump total_runs."""
+    state.setdefault("recent_runs", []).insert(0, run_summary)
+    state["recent_runs"] = state["recent_runs"][:MAX_RECENT_RUNS]
+    state.setdefault("stats", {"total_runs": 0, "total_emails_sent": 0})
+    state["stats"]["total_runs"] = state["stats"].get("total_runs", 0) + 1
+    if run_summary.get("emails_sent", 0):
+        state["stats"]["total_emails_sent"] = (
+            state["stats"].get("total_emails_sent", 0) + run_summary["emails_sent"]
+        )
 
 
 def prune(state: dict) -> None:
@@ -73,7 +92,16 @@ def mark_notified(state: dict, key: str) -> None:
 
 
 def _empty() -> dict:
-    return {"alerts": {}, "consecutive_failures": 0, "last_run": None}
+    return {
+        "alerts": {},
+        "consecutive_failures": 0,
+        "last_run": None,
+        "stats": {"total_runs": 0, "total_emails_sent": 0},
+        "current_cheap_flights": [],
+        "recent_runs": [],
+        "latest_error": None,
+        "config_snapshot": {},
+    }
 
 
 def _now() -> datetime:

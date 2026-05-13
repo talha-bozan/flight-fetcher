@@ -1,0 +1,13 @@
+{
+  "alerts": {},
+  "config_snapshot": {},
+  "consecutive_failures": 0,
+  "current_cheap_flights": [],
+  "last_run": null,
+  "latest_error": null,
+  "recent_runs": [],
+  "stats": {
+    "total_emails_sent": 0,
+    "total_runs": 0
+  }
+}

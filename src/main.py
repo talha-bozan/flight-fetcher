@@ -24,6 +24,7 @@ ERROR_LOG = Path(__file__).resolve().parent.parent / "last_error.log"
 
 
 def _run() -> None:
+    run_started = time.monotonic()
     logger.info(
         "Starting flight check: %d origins x %d destinations x %d dates",
         len(config.ORIGINS), len(config.DESTINATIONS), len(config.DEPARTURE_DATES),
@@ -32,18 +33,23 @@ def _run() -> None:
         logger.info("DRY_RUN mode ON; no emails will be sent")
     logger.info("Threshold: %.0f TL", config.THRESHOLD_TRY)
 
-    # Fail fast on bad SMTP creds — no point doing 36 queries first.
-    if not config.DRY_RUN:
-        ok, msg = notifier.smtp_self_test()
-        if ok:
-            logger.info("SMTP self-test OK")
-        else:
-            logger.error("SMTP self-test FAILED: %s", msg)
-            _write_error(f"SMTP self-test FAILED: {msg}")
-            # Continue anyway: fetch + log cheap flights even if email won't go.
-
     st = state.load()
     state.prune(st)
+    st["latest_error"] = None  # reset on each run; gets set below if anything fails
+
+    smtp_ok = True
+    smtp_msg = "DRY_RUN — skipped"
+    if not config.DRY_RUN:
+        smtp_ok, smtp_msg = notifier.smtp_self_test()
+        if smtp_ok:
+            logger.info("SMTP self-test OK")
+        else:
+            logger.error("SMTP self-test FAILED: %s", smtp_msg)
+            _write_error(f"SMTP self-test FAILED: {smtp_msg}")
+            st["latest_error"] = {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "message": f"SMTP self-test FAILED: {smtp_msg}",
+            }
 
     all_flights: list[dict] = []
     failures = 0
@@ -105,14 +111,22 @@ def _run() -> None:
             logger.info("  SKIP deduped %s", key)
 
     logger.info("New (not deduped) cheap flights: %d", len(new_cheap))
+    emails_sent = 0
     if new_cheap:
         try:
             notifier.send_alert(new_cheap)
+            if not config.DRY_RUN:
+                emails_sent = 1  # one consolidated email per run
             for f in new_cheap:
                 state.mark_notified(st, state.make_key(f, f["price_try"]))
         except Exception as e:
-            logger.error("send_alert failed: %s\n%s", e, traceback.format_exc())
-            _write_error(f"send_alert failed: {e}\n{traceback.format_exc()}")
+            tb = traceback.format_exc()
+            logger.error("send_alert failed: %s\n%s", e, tb)
+            _write_error(f"send_alert failed: {e}\n{tb}")
+            st["latest_error"] = {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "message": f"send_alert failed: {e}",
+            }
 
     if total > 0 and failures == total:
         st["consecutive_failures"] = st.get("consecutive_failures", 0) + 1
@@ -131,8 +145,56 @@ def _run() -> None:
             logger.info("Resetting consecutive_failures from %d to 0", st["consecutive_failures"])
         st["consecutive_failures"] = 0
 
+    # Update dashboard data on state.
+    valid_prices = [
+        f["price_try"] for f in all_flights
+        if f["price_try"] != float("inf") and f["price_try"] >= config.MIN_VALID_PRICE_TRY
+    ]
+    cheapest_try = min(valid_prices) if valid_prices else None
+    st["current_cheap_flights"] = [_serialise_flight(f) for f in cheap[:50]]
+    st["config_snapshot"] = {
+        "threshold_try": config.THRESHOLD_TRY,
+        "min_valid_price_try": config.MIN_VALID_PRICE_TRY,
+        "origins": list(config.ORIGINS),
+        "destinations": list(config.DESTINATIONS),
+        "dates": list(config.DEPARTURE_DATES),
+        "trip_type": config.TRIP_TYPE,
+        "recipient": config.RECIPIENT_EMAIL,
+        "sender": config.SENDER_EMAIL,
+    }
+    state.record_run(st, {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "duration_sec": round(time.monotonic() - run_started, 1),
+        "total_queries": total,
+        "queries_failed": failures,
+        "total_flights": len(all_flights),
+        "cheap_count": len(cheap),
+        "new_alert_count": len(new_cheap),
+        "cheapest_try": round(cheapest_try, 2) if cheapest_try is not None else None,
+        "emails_sent": emails_sent,
+        "smtp_ok": smtp_ok,
+        "smtp_msg": smtp_msg if not smtp_ok else "ok",
+        "dry_run": config.DRY_RUN,
+    })
+
     state.save(st)
     logger.info("Done.")
+
+
+def _serialise_flight(f: dict) -> dict:
+    return {
+        "origin": f["origin"],
+        "dest": f["dest"],
+        "date": f["date"],
+        "airline": f["airline"],
+        "departure": f["departure"],
+        "arrival": f["arrival"],
+        "duration": f["duration"],
+        "stops": f["stops"],
+        "price_str": f["price_str"],
+        "price_try": round(f["price_try"], 2) if f["price_try"] != float("inf") else None,
+        "currency": f.get("currency"),
+    }
 
 
 def _write_error(text: str) -> None:
@@ -155,7 +217,16 @@ def main() -> None:
         tb = traceback.format_exc()
         logger.error("UNCAUGHT in _run(): %s\n%s", e, tb)
         _write_error(f"UNCAUGHT in _run(): {e}\n{tb}")
-        # Best effort admin email — don't crash if even this fails.
+        # Try to surface in state.json too, so dashboard shows the crash.
+        try:
+            st = state.load()
+            st["latest_error"] = {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "message": f"UNCAUGHT: {e}\n{tb}"[:4000],
+            }
+            state.save(st)
+        except Exception:
+            pass
         try:
             notifier.send_admin_alert(f"flight-fetcher CRASH:\n{tb}")
         except Exception:

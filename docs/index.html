@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flight Fetcher — NL → IST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body {
+    background: radial-gradient(ellipse at top, #1e1b4b 0%, #0f172a 50%, #020617 100%);
+    min-height: 100vh;
+  }
+  .card {
+    background: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+  }
+  .stat-card {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.05) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+  }
+  .deal-row {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0) 100%);
+  }
+  .skeleton {
+    background: linear-gradient(90deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  details > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] > summary .chevron { transform: rotate(180deg); }
+  .chevron { transition: transform 0.2s; }
+</style>
+</head>
+<body class="font-sans text-slate-200 antialiased">
+
+<div class="max-w-6xl mx-auto px-4 py-8 md:py-12">
+
+  <header class="mb-10">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="text-4xl">✈️</span>
+      <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+        Flight Fetcher
+      </h1>
+    </div>
+    <p class="text-slate-400 ml-14">Hollanda → İstanbul uçuş fiyatı takibi · 10,000 TL altı düşerse mail atar</p>
+  </header>
+
+  <div id="error-banner" class="hidden mb-6 p-4 rounded-xl bg-red-950/50 border border-red-800/50">
+    <div class="flex items-start gap-3">
+      <span class="text-2xl shrink-0">⚠️</span>
+      <div class="flex-1 min-w-0">
+        <h3 class="font-semibold text-red-200">Son hata</h3>
+        <p class="text-sm text-red-300 mt-1" id="error-timestamp"></p>
+        <pre class="text-xs text-red-100 mt-2 whitespace-pre-wrap break-all font-mono opacity-80" id="error-message"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats grid -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
+    <div class="stat-card rounded-xl p-4">
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Son kontrol</div>
+      <div class="text-2xl font-bold text-white" id="stat-last-run">—</div>
+      <div class="text-xs text-slate-400 mt-1" id="stat-last-run-abs">—</div>
+    </div>
+    <div class="stat-card rounded-xl p-4">
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Eşik</div>
+      <div class="text-2xl font-bold text-white" id="stat-threshold">—</div>
+      <div class="text-xs text-slate-400 mt-1">tek yön TL</div>
+    </div>
+    <div class="stat-card rounded-xl p-4">
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Toplam run</div>
+      <div class="text-2xl font-bold text-white" id="stat-total-runs">—</div>
+      <div class="text-xs text-slate-400 mt-1" id="stat-emails">— mail atılmış</div>
+    </div>
+    <div class="stat-card rounded-xl p-4">
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Şu an ucuz</div>
+      <div class="text-2xl font-bold text-white" id="stat-cheap-now">—</div>
+      <div class="text-xs text-slate-400 mt-1" id="stat-cheapest">en düşük: —</div>
+    </div>
+  </section>
+
+  <!-- Current cheap flights -->
+  <section class="card rounded-2xl p-5 md:p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold flex items-center gap-2">
+        <span>🔥</span>
+        <span>Şu an 10K TL altı uçuşlar</span>
+        <span class="text-sm font-normal text-slate-400" id="cheap-count-pill"></span>
+      </h2>
+    </div>
+    <div id="cheap-flights-container">
+      <div class="text-center text-slate-500 py-8" id="cheap-flights-empty">Henüz veri yok — ilk run bekleniyor.</div>
+    </div>
+  </section>
+
+  <!-- Recent runs -->
+  <section class="card rounded-2xl p-5 md:p-6 mb-6">
+    <h2 class="text-lg font-semibold flex items-center gap-2 mb-4">
+      <span>📊</span>
+      <span>Son 20 run</span>
+    </h2>
+    <div id="recent-runs-container">
+      <div class="text-center text-slate-500 py-8" id="recent-runs-empty">Henüz veri yok.</div>
+    </div>
+  </section>
+
+  <!-- Config (collapsible) -->
+  <section class="card rounded-2xl mb-6 overflow-hidden">
+    <details>
+      <summary class="p-5 md:p-6 flex items-center justify-between hover:bg-slate-800/30">
+        <h2 class="text-lg font-semibold flex items-center gap-2">
+          <span>⚙️</span>
+          <span>Konfigürasyon</span>
+        </h2>
+        <svg class="chevron w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </summary>
+      <div class="px-5 md:px-6 pb-5 md:pb-6 grid md:grid-cols-2 gap-4 text-sm" id="config-container">
+        <div class="text-slate-500">—</div>
+      </div>
+    </details>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mt-12 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
+    <p>
+      <span class="text-slate-400">flight-fetcher</span> ·
+      <a href="https://github.com/talha-bozan/flight-fetcher" class="hover:text-indigo-300 underline-offset-4 hover:underline" target="_blank">GitHub repo</a> ·
+      Her 6 saatte bir otomatik kontrol ·
+      <span id="auto-refresh-tag">sayfa her 60s tazelenir</span>
+    </p>
+    <p class="mt-1">Son güncellenme: <span id="data-fetched-at">—</span></p>
+  </footer>
+
+</div>
+
+<script>
+const STATE_URL = "./state.json";
+
+async function loadData() {
+  try {
+    const res = await fetch(STATE_URL + "?t=" + Date.now(), {cache: "no-store"});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    showError({timestamp: new Date().toISOString(), message: "Dashboard veri yükleme hatası: " + e.message});
+  }
+  document.getElementById("data-fetched-at").textContent = new Date().toLocaleString("tr-TR");
+}
+
+function render(data) {
+  renderError(data.latest_error);
+  renderStats(data);
+  renderCheapFlights(data.current_cheap_flights || []);
+  renderRecentRuns(data.recent_runs || []);
+  renderConfig(data.config_snapshot || {});
+}
+
+function showError(err) {
+  const banner = document.getElementById("error-banner");
+  banner.classList.remove("hidden");
+  document.getElementById("error-timestamp").textContent = formatRelTime(err.timestamp);
+  document.getElementById("error-message").textContent = err.message;
+}
+
+function renderError(err) {
+  const banner = document.getElementById("error-banner");
+  if (!err) { banner.classList.add("hidden"); return; }
+  showError(err);
+}
+
+function renderStats(data) {
+  const lastRun = data.last_run;
+  document.getElementById("stat-last-run").textContent = lastRun ? formatRelTime(lastRun) : "—";
+  document.getElementById("stat-last-run-abs").textContent = lastRun ? new Date(lastRun).toLocaleString("tr-TR") : "—";
+
+  const cfg = data.config_snapshot || {};
+  document.getElementById("stat-threshold").textContent = cfg.threshold_try ? formatNumber(cfg.threshold_try) + " TL" : "—";
+
+  const stats = data.stats || {};
+  document.getElementById("stat-total-runs").textContent = stats.total_runs ?? 0;
+  document.getElementById("stat-emails").textContent = (stats.total_emails_sent ?? 0) + " mail atılmış";
+
+  const cheap = data.current_cheap_flights || [];
+  document.getElementById("stat-cheap-now").textContent = cheap.length;
+  if (cheap.length > 0) {
+    const cheapest = Math.min(...cheap.map(f => f.price_try ?? Infinity));
+    document.getElementById("stat-cheapest").textContent = "en düşük: " + formatNumber(Math.round(cheapest)) + " TL";
+  } else {
+    // Show cheapest seen in latest run (even if not under threshold)
+    const lastRunSummary = (data.recent_runs || [])[0];
+    if (lastRunSummary && lastRunSummary.cheapest_try) {
+      document.getElementById("stat-cheapest").textContent =
+        "son taramada en düşük: " + formatNumber(Math.round(lastRunSummary.cheapest_try)) + " TL";
+    } else {
+      document.getElementById("stat-cheapest").textContent = "veri yok";
+    }
+  }
+}
+
+function renderCheapFlights(flights) {
+  const container = document.getElementById("cheap-flights-container");
+  const empty = document.getElementById("cheap-flights-empty");
+  const pill = document.getElementById("cheap-count-pill");
+
+  if (flights.length === 0) {
+    empty.textContent = "🤷 Şu an 10K TL altı uçuş yok. Bot her 6 saatte bir kontrole devam ediyor.";
+    container.innerHTML = empty.outerHTML;
+    pill.textContent = "";
+    return;
+  }
+
+  pill.textContent = `(${flights.length})`;
+  flights.sort((a, b) => (a.price_try ?? Infinity) - (b.price_try ?? Infinity));
+
+  const rows = flights.map(f => {
+    const link = `https://www.google.com/travel/flights?q=Flights+from+${f.origin}+to+${f.dest}+on+${f.date}`;
+    return `
+      <a href="${link}" target="_blank" rel="noopener" class="deal-row flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/40 transition-colors">
+        <div class="shrink-0 w-20">
+          <div class="text-xs text-slate-500 uppercase tracking-wider">Rota</div>
+          <div class="font-semibold text-white">${escape(f.origin)}→${escape(f.dest)}</div>
+        </div>
+        <div class="shrink-0 w-24">
+          <div class="text-xs text-slate-500 uppercase tracking-wider">Tarih</div>
+          <div class="font-mono text-sm text-slate-200">${escape(f.date)}</div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs text-slate-500 uppercase tracking-wider">Sefer</div>
+          <div class="text-sm text-slate-200 truncate">${escape(f.airline)} · ${escape(f.departure)}</div>
+          <div class="text-xs text-slate-500 truncate">${escape(f.duration)} · ${f.stops > 0 ? f.stops + ' aktarma' : 'direkt'}</div>
+        </div>
+        <div class="shrink-0 text-right">
+          <div class="text-2xl font-bold text-green-400">${formatNumber(Math.round(f.price_try))} TL</div>
+          <div class="text-xs text-slate-500">${escape(f.price_str)} · Google Flights →</div>
+        </div>
+      </a>`;
+  }).join("");
+
+  container.innerHTML = `<div class="space-y-2">${rows}</div>`;
+}
+
+function renderRecentRuns(runs) {
+  const container = document.getElementById("recent-runs-container");
+  if (runs.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-500 py-8">Henüz run yok.</div>';
+    return;
+  }
+
+  const rows = runs.map(r => {
+    const ts = new Date(r.timestamp);
+    const tsRel = formatRelTime(r.timestamp);
+    const tsAbs = ts.toLocaleString("tr-TR");
+    const errorBadge = r.smtp_ok === false
+      ? '<span class="px-1.5 py-0.5 text-[10px] rounded bg-red-950 text-red-300 ml-2">SMTP</span>'
+      : '';
+    const cheapBadge = r.cheap_count > 0
+      ? `<span class="text-green-400 font-semibold">${r.cheap_count}</span>`
+      : '<span class="text-slate-500">0</span>';
+    const mailBadge = r.emails_sent > 0
+      ? '<span class="text-indigo-300">📧</span>'
+      : '<span class="text-slate-600">—</span>';
+    const cheapest = r.cheapest_try ? formatNumber(Math.round(r.cheapest_try)) + ' TL' : '—';
+    return `
+      <tr class="border-b border-slate-800/50 last:border-0">
+        <td class="py-2.5 pr-4 text-sm">
+          <div class="text-slate-200">${tsRel}${errorBadge}</div>
+          <div class="text-xs text-slate-500 font-mono">${tsAbs}</div>
+        </td>
+        <td class="py-2.5 px-2 text-sm text-slate-300 text-center">${r.total_flights ?? '—'}</td>
+        <td class="py-2.5 px-2 text-sm text-center">${cheapBadge}</td>
+        <td class="py-2.5 px-2 text-sm text-center">${mailBadge}</td>
+        <td class="py-2.5 px-2 text-sm text-slate-300 text-right font-mono">${cheapest}</td>
+        <td class="py-2.5 pl-2 text-xs text-slate-500 text-right">${r.duration_sec ?? '—'}s</td>
+      </tr>`;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="overflow-x-auto -mx-2">
+      <table class="w-full">
+        <thead>
+          <tr class="text-xs uppercase tracking-wider text-slate-500">
+            <th class="py-2 pr-4 text-left font-medium">Zaman</th>
+            <th class="py-2 px-2 text-center font-medium">Uçuş</th>
+            <th class="py-2 px-2 text-center font-medium">Ucuz</th>
+            <th class="py-2 px-2 text-center font-medium">Mail</th>
+            <th class="py-2 px-2 text-right font-medium">En düşük</th>
+            <th class="py-2 pl-2 text-right font-medium">Süre</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderConfig(cfg) {
+  const container = document.getElementById("config-container");
+  if (!cfg || Object.keys(cfg).length === 0) {
+    container.innerHTML = '<div class="text-slate-500 col-span-2">Konfigürasyon henüz yazılmamış (ilk run sonrası gelecek).</div>';
+    return;
+  }
+  const items = [
+    ["Çıkış havalimanları", (cfg.origins || []).join(", ")],
+    ["Varış havalimanları", (cfg.destinations || []).join(", ")],
+    ["Tarihler", (cfg.dates || []).join(", ")],
+    ["Uçuş tipi", cfg.trip_type || "—"],
+    ["Eşik", formatNumber(cfg.threshold_try || 0) + " TL"],
+    ["Minimum geçerli fiyat", formatNumber(cfg.min_valid_price_try || 0) + " TL"],
+    ["Alıcı mail", cfg.recipient || "—"],
+    ["Gönderici mail", cfg.sender || "—"],
+  ];
+  container.innerHTML = items.map(([k, v]) => `
+    <div>
+      <div class="text-xs text-slate-500 uppercase tracking-wider mb-0.5">${escape(k)}</div>
+      <div class="text-slate-200 break-words">${escape(v)}</div>
+    </div>
+  `).join("");
+}
+
+function formatRelTime(iso) {
+  if (!iso) return "—";
+  const then = new Date(iso);
+  const now = new Date();
+  const sec = Math.floor((now - then) / 1000);
+  if (sec < 60) return sec + " sn önce";
+  if (sec < 3600) return Math.floor(sec / 60) + " dk önce";
+  if (sec < 86400) return Math.floor(sec / 3600) + " saat önce";
+  return Math.floor(sec / 86400) + " gün önce";
+}
+
+function formatNumber(n) {
+  return Math.round(n).toLocaleString("tr-TR");
+}
+
+function escape(s) {
+  if (s == null) return "—";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+loadData();
+setInterval(loadData, 60000);
+
+// Refresh relative timestamps every 30s without re-fetching
+setInterval(() => {
+  document.querySelectorAll("[data-rel-ts]").forEach(el => {
+    el.textContent = formatRelTime(el.dataset.relTs);
+  });
+}, 30000);
+</script>
+
+</body>
+</html>

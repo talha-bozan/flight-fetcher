@@ -11,7 +11,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write   # to commit updated docs/state.json back to the repo
 
 concurrency:
   group: flight-check
@@ -29,15 +29,6 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Restore state cache (dedupe history)
-        id: cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: state.json
-          key: flight-state-${{ github.run_id }}
-          restore-keys: |
-            flight-state-
-
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -48,20 +39,27 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: python -m src.main
 
-      - name: Save state cache
+      - name: Commit dashboard state
         if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: state.json
-          key: flight-state-${{ github.run_id }}
+        run: |
+          git config user.name "flight-bot"
+          git config user.email "actions@github.com"
+          git add docs/state.json 2>/dev/null || true
+          if ! git diff --staged --quiet; then
+            git commit -m "dashboard: update state [skip ci]"
+            # Retry once on race with another run (rare; concurrency group prevents it usually)
+            git push || (git pull --rebase && git push)
+          else
+            echo "No state changes to commit"
+          fi
 
-      - name: Upload diagnostic artifacts
+      - name: Upload diagnostics as artifact (fallback if push fails)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: diagnostics-${{ github.run_number }}
           path: |
-            state.json
+            docs/state.json
             last_error.log
           if-no-files-found: ignore
           retention-days: 30
@@ -72,13 +70,14 @@ jobs:
           {
             echo "## Flight Check #${{ github.run_number }}"
             echo ""
-            echo "### state.json"
+            echo "### state.json (latest)"
             echo '```json'
-            if [ -f state.json ]; then
-              cat state.json
+            if [ -f docs/state.json ]; then
+              head -c 4000 docs/state.json
             else
-              echo "(file missing)"
+              echo "(missing)"
             fi
+            echo ""
             echo '```'
             echo ""
             if [ -f last_error.log ]; then
@@ -89,4 +88,6 @@ jobs:
             else
               echo "### last_error.log: (no errors)"
             fi
+            echo ""
+            echo "**Dashboard:** https://talha-bozan.github.io/flight-fetcher/"
           } >> "$GITHUB_STEP_SUMMARY"
