@@ -113,20 +113,31 @@ def _run() -> None:
     logger.info("New (not deduped) cheap flights: %d", len(new_cheap))
     emails_sent = 0
     if new_cheap:
-        try:
-            notifier.send_alert(new_cheap)
-            if not config.DRY_RUN:
-                emails_sent = 1  # one consolidated email per run
-            for f in new_cheap:
-                state.mark_notified(st, state.make_key(f, f["price_try"]))
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.error("send_alert failed: %s\n%s", e, tb)
-            _write_error(f"send_alert failed: {e}\n{tb}")
-            st["latest_error"] = {
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "message": f"send_alert failed: {e}",
-            }
+        if not smtp_ok:
+            # Self-test already failed; don't retry send (it would just re-raise
+            # the same auth error and overwrite the cleaner self-test message).
+            # DON'T mark notified here — once SMTP is fixed, the next run should
+            # re-discover these flights and send the email that this run owed.
+            logger.warning(
+                "Skipping email send for %d cheap flights — SMTP self-test "
+                "failed earlier: %s. Will retry on next run.",
+                len(new_cheap), smtp_msg,
+            )
+        else:
+            try:
+                notifier.send_alert(new_cheap)
+                if not config.DRY_RUN:
+                    emails_sent = 1  # one consolidated email per run
+                for f in new_cheap:
+                    state.mark_notified(st, state.make_key(f, f["price_try"]))
+            except Exception as e:
+                tb = traceback.format_exc()
+                logger.error("send_alert failed: %s\n%s", e, tb)
+                _write_error(f"send_alert failed: {e}\n{tb}")
+                st["latest_error"] = {
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "message": f"send_alert failed: {e}",
+                }
 
     if total > 0 and failures == total:
         st["consecutive_failures"] = st.get("consecutive_failures", 0) + 1
