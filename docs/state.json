@@ -40,38 +40,52 @@
       "stops": "Unknown"
     },
     {
-      "airline": "LOT",
-      "arrival": "1:05 PM on Sat, Jul 25",
+      "airline": "?",
+      "arrival": "?",
       "currency": "USD",
       "date": "2026-07-24",
-      "departure": "2:15 PM on Fri, Jul 24",
+      "departure": "?",
       "dest": "IST",
-      "duration": "21 hr 50 min",
+      "duration": "?",
       "origin": "AMS",
       "price_str": "$212",
       "price_try": 9628.56,
-      "stops": 1
+      "stops": "Unknown"
     },
     {
-      "airline": "Air Serbia",
-      "arrival": "3:55 PM on Sat, Jul 25",
+      "airline": "?",
+      "arrival": "?",
       "currency": "USD",
       "date": "2026-07-24",
-      "departure": "9:10 PM on Fri, Jul 24",
+      "departure": "?",
       "dest": "IST",
-      "duration": "17 hr 45 min",
+      "duration": "?",
       "origin": "AMS",
       "price_str": "$213",
       "price_try": 9673.98,
-      "stops": 1
+      "stops": "Unknown"
     }
   ],
-  "last_run": "2026-05-13T17:54:34.062113+00:00",
+  "last_run": "2026-05-13T18:10:10.079352+00:00",
   "latest_error": {
-    "message": "send_alert failed: (535, b'5.7.8 Username and Password not accepted. For more information, go to\\n5.7.8  https://support.google.com/mail/?p=BadCredentials a92af1059eb24-134cbcb9ed3sm220487c88.1 - gsmtp')",
-    "timestamp": "2026-05-13T17:54:34.061737+00:00"
+    "message": "SMTP self-test FAILED: SMTP authentication FAILED: 535 b'5.7.8 Username and Password not accepted. For more information, go to\\n5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-5148e7bef56sm154954891cf.15 - gsmtp'. Common causes: (1) sender email mismatch — the app password belongs to talhabozan@gmail.com; (2) 2-Step Verification disabled on the Google account; (3) wrong/old app password in the GMAIL_APP_PASSWORD secret.",
+    "timestamp": "2026-05-13T18:08:55.597602+00:00"
   },
   "recent_runs": [
+    {
+      "cheap_count": 3,
+      "cheapest_try": 9628.56,
+      "dry_run": false,
+      "duration_sec": 74.8,
+      "emails_sent": 0,
+      "new_alert_count": 2,
+      "queries_failed": 2,
+      "smtp_msg": "SMTP authentication FAILED: 535 b'5.7.8 Username and Password not accepted. For more information, go to\\n5.7.8  https://support.google.com/mail/?p=BadCredentials d75a77b69052e-5148e7bef56sm154954891cf.15 - gsmtp'. Common causes: (1) sender email mismatch — the app password belongs to talhabozan@gmail.com; (2) 2-Step Verification disabled on the Google account; (3) wrong/old app password in the GMAIL_APP_PASSWORD secret.",
+      "smtp_ok": false,
+      "timestamp": "2026-05-13T18:10:10.079326+00:00",
+      "total_flights": 797,
+      "total_queries": 36
+    },
     {
       "cheap_count": 3,
       "cheapest_try": 9628.56,
@@ -89,6 +103,6 @@
   ],
   "stats": {
     "total_emails_sent": 0,
-    "total_runs": 1
+    "total_runs": 2
   }
 }
