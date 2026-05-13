@@ -26,8 +26,8 @@ def send_alert(flights: list[dict]) -> None:
             )
         return
 
-    if not config.GMAIL_APP_PASSWORD:
-        logger.error("GMAIL_APP_PASSWORD env not set; cannot send email")
+    if not config.SMTP_PASSWORD:
+        logger.error("SMTP_PASSWORD env not set; cannot send email")
         return
 
     msg = EmailMessage()
@@ -43,8 +43,8 @@ def send_admin_alert(message: str) -> None:
     if config.DRY_RUN:
         logger.info(f"[DRY_RUN] admin alert: {message}")
         return
-    if not config.GMAIL_APP_PASSWORD:
-        logger.error("GMAIL_APP_PASSWORD not set; cannot send admin alert")
+    if not config.SMTP_PASSWORD:
+        logger.error("SMTP_PASSWORD not set; cannot send admin alert")
         return
     msg = EmailMessage()
     msg["Subject"] = "[flight-fetcher] FAILURE"
