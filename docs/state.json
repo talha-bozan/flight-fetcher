@@ -1,7 +1,7 @@
 {
   "alerts": {
     "AMS-IST-2026-07-23-9500": "2026-05-13T18:31:52.024399+00:00",
-    "AMS-IST-2026-07-24-9500": "2026-05-13T18:31:52.024425+00:00"
+    "AMS-IST-2026-07-24-9500": "2026-05-14T19:48:02.714666+00:00"
   },
   "config_snapshot": {
     "dates": [
@@ -30,35 +30,36 @@
   "consecutive_failures": 0,
   "current_cheap_flights": [
     {
-      "airline": "LOT",
-      "arrival": "1:05 PM on Sat, Jul 25",
+      "airline": "?",
+      "arrival": "?",
       "currency": "USD",
       "date": "2026-07-24",
-      "departure": "2:15 PM on Fri, Jul 24",
+      "departure": "?",
       "dest": "IST",
-      "duration": "21 hr 50 min",
+      "duration": "?",
       "origin": "AMS",
-      "price_str": "$212",
-      "price_try": 9628.56,
-      "stops": 1
-    },
-    {
-      "airline": "Air Serbia",
-      "arrival": "3:55 PM on Sat, Jul 25",
-      "currency": "USD",
-      "date": "2026-07-24",
-      "departure": "9:10 PM on Fri, Jul 24",
-      "dest": "IST",
-      "duration": "17 hr 45 min",
-      "origin": "AMS",
-      "price_str": "$213",
-      "price_try": 9673.98,
-      "stops": 1
+      "price_str": "$211",
+      "price_try": 9586.72,
+      "stops": "Unknown"
     }
   ],
-  "last_run": "2026-05-14T14:14:42.218609+00:00",
+  "last_run": "2026-05-14T19:48:02.714947+00:00",
   "latest_error": null,
   "recent_runs": [
+    {
+      "cheap_count": 1,
+      "cheapest_try": 9586.72,
+      "dry_run": false,
+      "duration_sec": 76.4,
+      "emails_sent": 1,
+      "new_alert_count": 1,
+      "queries_failed": 2,
+      "smtp_msg": "ok",
+      "smtp_ok": true,
+      "timestamp": "2026-05-14T19:48:02.714931+00:00",
+      "total_flights": 786,
+      "total_queries": 36
+    },
     {
       "cheap_count": 2,
       "cheapest_try": 9628.56,
@@ -173,7 +174,7 @@
     }
   ],
   "stats": {
-    "total_emails_sent": 1,
-    "total_runs": 8
+    "total_emails_sent": 2,
+    "total_runs": 9
   }
 }
