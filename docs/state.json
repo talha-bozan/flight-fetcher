@@ -1,6 +1,6 @@
 {
   "alerts": {
-    "AMS-IST-2026-07-23-9500": "2026-05-13T18:31:52.024399+00:00",
+    "AMS-IST-2026-07-23-9500": "2026-05-15T03:35:29.631069+00:00",
     "AMS-IST-2026-07-24-9500": "2026-05-14T19:48:02.714666+00:00"
   },
   "config_snapshot": {
@@ -33,7 +33,7 @@
       "airline": "?",
       "arrival": "?",
       "currency": "USD",
-      "date": "2026-07-24",
+      "date": "2026-07-23",
       "departure": "?",
       "dest": "IST",
       "duration": "?",
@@ -41,11 +41,38 @@
       "price_str": "$211",
       "price_try": 9586.72,
       "stops": "Unknown"
+    },
+    {
+      "airline": "LOT",
+      "arrival": "1:05 PM on Sat, Jul 25",
+      "currency": "USD",
+      "date": "2026-07-24",
+      "departure": "2:15 PM on Fri, Jul 24",
+      "dest": "IST",
+      "duration": "21 hr 50 min",
+      "origin": "AMS",
+      "price_str": "$211",
+      "price_try": 9586.72,
+      "stops": 1
     }
   ],
-  "last_run": "2026-05-14T19:48:02.714947+00:00",
+  "last_run": "2026-05-15T03:35:29.631360+00:00",
   "latest_error": null,
   "recent_runs": [
+    {
+      "cheap_count": 2,
+      "cheapest_try": 9586.72,
+      "dry_run": false,
+      "duration_sec": 75.2,
+      "emails_sent": 1,
+      "new_alert_count": 1,
+      "queries_failed": 2,
+      "smtp_msg": "ok",
+      "smtp_ok": true,
+      "timestamp": "2026-05-15T03:35:29.631344+00:00",
+      "total_flights": 907,
+      "total_queries": 36
+    },
     {
       "cheap_count": 1,
       "cheapest_try": 9586.72,
@@ -174,7 +201,7 @@
     }
   ],
   "stats": {
-    "total_emails_sent": 2,
-    "total_runs": 9
+    "total_emails_sent": 3,
+    "total_runs": 10
   }
 }
