@@ -26,9 +26,23 @@
   },
   "consecutive_failures": 0,
   "current_cheap_flights": [],
-  "last_run": "2026-05-25T19:41:58.482547+00:00",
+  "last_run": "2026-05-26T03:38:51.764890+00:00",
   "latest_error": null,
   "recent_runs": [
+    {
+      "cheap_count": 0,
+      "cheapest_try": 10834.26,
+      "dry_run": false,
+      "duration_sec": 74.9,
+      "emails_sent": 0,
+      "new_alert_count": 0,
+      "queries_failed": 2,
+      "smtp_msg": "ok",
+      "smtp_ok": true,
+      "timestamp": "2026-05-26T03:38:51.764853+00:00",
+      "total_flights": 875,
+      "total_queries": 36
+    },
     {
       "cheap_count": 0,
       "cheapest_try": 10834.26,
@@ -294,24 +308,10 @@
       "timestamp": "2026-05-21T09:43:16.515663+00:00",
       "total_flights": 903,
       "total_queries": 36
-    },
-    {
-      "cheap_count": 0,
-      "cheapest_try": 10576.06,
-      "dry_run": false,
-      "duration_sec": 72.8,
-      "emails_sent": 0,
-      "new_alert_count": 0,
-      "queries_failed": 2,
-      "smtp_msg": "ok",
-      "smtp_ok": true,
-      "timestamp": "2026-05-21T03:50:05.840157+00:00",
-      "total_flights": 864,
-      "total_queries": 36
     }
   ],
   "stats": {
     "total_emails_sent": 6,
-    "total_runs": 53
+    "total_runs": 54
   }
 }
